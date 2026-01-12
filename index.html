@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Twinnie Chat 💖</title>
+  
+  <!-- PWA -->
+  <meta name="theme-color" content="#ff69b4"/>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="https://files.catbox.moe/74tj86.jpg"/>
+  
+  <!-- Google Fonts for Cute Look -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Firebase CDN (v10 modular - updated for 2026) -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+    import { 
+      getAuth, 
+      createUserWithEmailAndPassword, 
+      signInWithEmailAndPassword, 
+      signOut,
+      onAuthStateChanged,
+      setPersistence, 
+      browserLocalPersistence,
+      updateProfile
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import { 
+      getFirestore, 
+      collection, 
+      addDoc, 
+      setDoc,
+      getDoc,
+      updateDoc,
+      serverTimestamp, 
+      query, 
+      orderBy, 
+      onSnapshot, 
+      doc, 
+      deleteDoc,
+      getDocs,
+      where,
+      arrayUnion
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    import {
+      getMessaging,
+      getToken,
+      onMessage
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-messaging.js";
+
+    window.firebaseModules = {
+      initializeApp, getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+      signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, updateProfile,
+      getFirestore, collection, addDoc, setDoc, getDoc, updateDoc, serverTimestamp, query, orderBy, onSnapshot,
+      doc, deleteDoc, getDocs, where, arrayUnion,
+      getMessaging, getToken, onMessage
+    };
+  </script>
+
+  <style>
+    :root {
+      --bg: #1a0033;
+      --bg-card: rgba(30, 0, 60, 0.8);
+      --primary: #ff69b4;
+      --primary-dark: #ff1493;
+      --text: #ffd1dc;
+      --text-muted: #ffb6c1;
+      --border: #ff69b4;
+      --danger: #ff4500;
+      --neon-glow: 0 0 10px #ff69b4, 0 0 20px #ff1493, 0 0 30px #db7093;
+      --cute-shadow: 0 4px 15px rgba(255,105,180,0.3);
+    }
+
+    [data-theme="light"] {
+      --bg: #fff0f5;
+      --bg-card: #ffffff;
+      --primary: #ff69b4;
+      --primary-dark: #ff1493;
+      --text: #4b0082;
+      --text-muted: #800080;
+      --border: #ffc0cb;
+      --danger: #ff4500;
+      --neon-glow: 0 0 10px #ff69b4, 0 0 20px #ff1493, 0 0 30px #db7093;
+      --cute-shadow: 0 4px 15px rgba(255,105,180,0.2);
+    }
+
+    * {
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+    }
+
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      background-image: 
+        radial-gradient(circle at 20% 30%, rgba(255,105,180,0.15) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(255,20,147,0.12) 0%, transparent 40%);
+      background-attachment: fixed;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 1rem;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 1.2rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: var(--neon-glow);
+    }
+
+    h1 {
+      font-size: 1.8rem;
+      background: linear-gradient(90deg, #ff69b4, #ff1493);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: var(--neon-glow);
+    }
+
+    button {
+      padding: 0.65rem 1.4rem;
+      border: none;
+      border-radius: 20px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: var(--primary);
+      color: white;
+      box-shadow: var(--cute-shadow);
+      animation: pulse 2s infinite;
+    }
+
+    button:hover {
+      transform: scale(1.05);
+      box-shadow: var(--neon-glow);
+    }
+
+    button.danger {
+      background: var(--danger);
+    }
+
+    .screen {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      padding: 1.5rem 0;
+    }
+
+    .screen.active {
+      display: flex;
+    }
+
+    .auth-box {
+      background: var(--bg-card);
+      padding: 2.5rem;
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      width: 100%;
+      max-width: 420px;
+      margin: auto;
+      box-shadow: var(--neon-glow);
+      animation: fadeIn 1s ease;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 0.9rem 1.1rem;
+      margin: 0.7rem 0;
+      border-radius: 15px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.08);
+      color: var(--text);
+      font-size: 1rem;
+      box-shadow: var(--cute-shadow);
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: var(--neon-glow);
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.5rem 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+      scrollbar-width: thin;
+    }
+
+    .message {
+      max-width: 78%;
+      padding: 1rem 1.5rem;
+      border-radius: 24px;
+      position: relative;
+      animation: bounceIn 0.5s ease;
+      box-shadow: var(--cute-shadow);
+    }
+
+    .message.sent {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #ff69b4 0%, #ff1493 100%);
+      color: white;
+      border-bottom-right-radius: 8px;
+    }
+
+    .message.received {
+      align-self: flex-start;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 8px;
+    }
+
+    .msg-sender {
+      font-size: 0.85rem;
+      font-weight: 600;
+      opacity: 0.9;
+      margin-bottom: 0.4rem;
+    }
+
+    .msg-time {
+      font-size: 0.7rem;
+      opacity: 0.7;
+      margin-top: 0.45rem;
+      text-align: right;
+    }
+
+    .input-area {
+      display: flex;
+      gap: 0.8rem;
+      padding: 1rem 0;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+      box-shadow: var(--neon-glow);
+    }
+
+    textarea {
+      flex: 1;
+      resize: none;
+      height: 52px;
+      min-height: 52px;
+      max-height: 140px;
+      border-radius: 15px;
+    }
+
+    #sendBtn {
+      align-self: flex-end;
+      padding: 0.9rem 1.6rem;
+    }
+
+    .theme-toggle {
+      background: none;
+      color: var(--text);
+      font-size: 1.4rem;
+      padding: 0.5rem;
+      border-radius: 50%;
+      box-shadow: none;
+      animation: none;
+    }
+
+    .theme-toggle:hover {
+      background: rgba(255,255,255,0.15);
+      box-shadow: var(--neon-glow);
+    }
+
+    footer {
+      text-align: center;
+      padding: 1.5rem 0;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      border-top: 1px solid var(--border);
+    }
+
+    /* Animations for Cute Neon */
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes bounceIn {
+      0% { opacity: 0; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.05); }
+      100% { transform: scale(1); }
+    }
+
+    /* Modal for Admin Panel */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.7);
+      justify-content: center;
+      align-items: center;
+    }
+
+    .modal-content {
+      background: var(--bg-card);
+      padding: 2rem;
+      border-radius: 24px;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: var(--neon-glow);
+      animation: fadeIn 0.5s;
+    }
+
+    .close {
+      float: right;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .user-list, .msg-list {
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+
+    .user-item, .msg-item {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    @media (max-width: 500px) {
+      .auth-box { padding: 1.8rem; }
+      h1 { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- ── AUTH SCREENS ─────────────────────────────────────── -->
+  <div id="authScreen" class="screen active">
+    <div class="auth-box">
+      <h1 style="text-align:center;margin-bottom:1.8rem">Twinnie Chat 💖</h1>
+      
+      <div style="display:flex;gap:1rem;margin-bottom:1.5rem">
+        <button id="showLogin" style="flex:1">Login ✨</button>
+        <button id="showRegister" style="flex:1;background:var(--bg-card);color:var(--primary)">Register 🌟</button>
+      </div>
+
+      <form id="loginForm">
+        <input type="email" id="loginEmail" placeholder="Email 📧" required autocomplete="email"/>
+        <input type="password" id="loginPass" placeholder="Password 🔒" required autocomplete="current-password"/>
+        <button type="submit" style="width:100%;margin-top:1rem">Login 💕</button>
+      </form>
+
+      <form id="registerForm" style="display:none">
+        <input type="text" id="regName" placeholder="Display Name 😊" required autocomplete="name"/>
+        <input type="email" id="regEmail" placeholder="Email 📧" required autocomplete="email"/>
+        <input type="password" id="regPass" placeholder="Password (min 6 chars) 🔒" required autocomplete="new-password"/>
+        <button type="submit" style="width:100%;margin-top:1rem">Create Account 🎉</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── MAIN CHAT ────────────────────────────────────────── -->
+  <div id="chatScreen" class="screen">
+    <header>
+      <h1>Twinnie Chat 💖</h1>
+      <div style="display:flex;gap:0.8rem;align-items:center">
+        <button class="theme-toggle" id="themeToggle">☀️</button>
+        <button id="adminBtn" style="display:none">Admin ⚙️</button>
+        <button id="logoutBtn" class="danger">Logout 👋</button>
+      </div>
+    </header>
+
+    <div class="chat-messages" id="messages"></div>
+
+    <div class="input-area">
+      <textarea id="messageInput" placeholder="Type your message... 💬" rows="1"></textarea>
+      <button id="sendBtn">Send 🚀</button>
+    </div>
+  </div>
+
+  <!-- Admin Modal -->
+  <div id="adminModal" class="modal">
+    <div class="modal-content">
+      <span class="close" id="closeAdmin">&times;</span>
+      <h2>Admin Panel 🔒</h2>
+      <h3>Users:</h3>
+      <div class="user-list" id="userList"></div>
+      <h3>Messages:</h3>
+      <div class="msg-list" id="msgList"></div>
+    </div>
+  </div>
+
+  <footer>Built with ❤️ by Tech Brian & Merab 💬</footer>
+
+</div>
+
+<script type="module">
+  const {
+    initializeApp, getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, updateProfile,
+    getFirestore, collection, addDoc, setDoc, getDoc, updateDoc, serverTimestamp, query, orderBy, onSnapshot,
+    doc, deleteDoc, getDocs, where, arrayUnion,
+    getMessaging, getToken, onMessage
+  } = window.firebaseModules;
+
+  // ── CONFIG ────────────────────────────────────────────────────
+  const firebaseConfig = {
+    apiKey: "AIzaSyCwcdPhGcHb6kDhVPYJgV0lpZoWX3qSn4A",           // ← CHANGE!
+    authDomain: "heartline-6bb08.firebaseapp.com",
+    projectId: "heartline-6bb08",
+    storageBucket: "heartline-6bb08.firebasestorage.app",
+    messagingSenderId: "372851895770",
+    appId: "1:372851895770:web:aac0ae1e5bdb22482c24e3"
+    measurementId: "G-C51VHHGKG6"  // Optional for analytics, but good for FCM
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const messaging = getMessaging(app);
+
+  // ── DOM ELEMENTS ──────────────────────────────────────────────
+  const 
+    authScreen   = document.getElementById('authScreen'),
+    chatScreen   = document.getElementById('chatScreen'),
+    loginForm    = document.getElementById('loginForm'),
+    regForm      = document.getElementById('registerForm'),
+    showLogin    = document.getElementById('showLogin'),
+    showRegister = document.getElementById('showRegister'),
+    logoutBtn    = document.getElementById('logoutBtn'),
+    adminBtn     = document.getElementById('adminBtn'),
+    messagesDiv  = document.getElementById('messages'),
+    msgInput     = document.getElementById('messageInput'),
+    sendBtn      = document.getElementById('sendBtn'),
+    themeToggle  = document.getElementById('themeToggle'),
+    adminModal   = document.getElementById('adminModal'),
+    closeAdmin   = document.getElementById('closeAdmin'),
+    userList     = document.getElementById('userList'),
+    msgList      = document.getElementById('msgList');
+
+  let currentUser = null;
+  let unsubscribeMessages = null;
+  let isAdmin = false;
+
+  // ── THEME TOGGLE ──────────────────────────────────────────────
+  function initTheme() {
+    const saved = localStorage.getItem('theme') || 
+                 (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', saved);
+    themeToggle.textContent = saved === 'dark' ? '☀️' : '🌙';
+  }
+
+  themeToggle.onclick = () => {
+    const current = document.documentElement.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('theme', next);
+    themeToggle.textContent = next === 'dark' ? '☀️' : '🌙';
+  };
+
+  // ── UI HELPERS ────────────────────────────────────────────────
+  function showScreen(screen) {
+    authScreen.classList.toggle('active', screen === 'auth');
+    chatScreen.classList.toggle('active', screen === 'chat');
+  }
+
+  function formatDate(ts) {
+    if (!ts) return '';
+    const date = ts.toDate ? ts.toDate() : new Date(ts);
+    return date.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+  }
+
+  // ── AUTH ──────────────────────────────────────────────────────
+  setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+  onAuthStateChanged(auth, async user => {
+    currentUser = user;
+    
+    if (user) {
+      showScreen('chat');
+      // Check if admin (e.g., specific email)
+      isAdmin = user.email === 'admin@example.com'; // ← CHANGE TO YOUR ADMIN EMAIL!
+      adminBtn.style.display = isAdmin ? 'block' : 'none';
+      startListeningMessages();
+      setupPushNotifications();
+    } else {
+      showScreen('auth');
+      if (unsubscribeMessages) unsubscribeMessages();
+      unsubscribeMessages = null;
+      messagesDiv.innerHTML = '';
+    }
+  });
+
+  showLogin.onclick = () => {
+    loginForm.style.display = 'block';
+    regForm.style.display = 'none';
+    showLogin.style.background = 'var(--primary)';
+    showLogin.style.color = 'white';
+    showRegister.style.background = 'var(--bg-card)';
+    showRegister.style.color = 'var(--primary)';
+  };
+
+  showRegister.onclick = () => {
+    loginForm.style.display = 'none';
+    regForm.style.display = 'block';
+    showRegister.style.background = 'var(--primary)';
+    showRegister.style.color = 'white';
+    showLogin.style.background = 'var(--bg-card)';
+    showLogin.style.color = 'var(--primary)';
+  };
+
+  loginForm.onsubmit = async e => {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value;
+    const pass  = document.getElementById('loginPass').value;
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+      // Check ban status
+      const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      if (userDoc.exists() && userDoc.data().banned) {
+        alert('Your account is banned! 😔');
+        signOut(auth);
+      }
+    } catch (err) {
+      alert("Login failed: " + (err.message.split('Firebase: ')[1] || err.message));
+    }
+  };
+
+  regForm.onsubmit = async e => {
+    e.preventDefault();
+    const name  = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value;
+    const pass  = document.getElementById('regPass').value;
+
+    if (pass.length < 6) return alert("Password should be at least 6 characters 🔒");
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(userCredential.user, { displayName: name });
+      await setDoc(doc(db, 'users', userCredential.user.uid), {
+        name,
+        email,
+        createdAt: serverTimestamp(),
+        banned: false
+      });
+      alert("Account created! Welcome " + name + " 🎉");
+    } catch (err) {
+      alert("Registration failed: " + (err.message.split('Firebase: ')[1] || err.message));
+    }
+  };
+
+  logoutBtn.onclick = () => signOut(auth).catch(console.error);
+
+  // ── MESSAGES ──────────────────────────────────────────────────
+  function startListeningMessages() {
+    if (unsubscribeMessages) unsubscribeMessages();
+
+    const q = query(
+      collection(db, "messages"),
+      orderBy("createdAt", "asc")
+    );
+
+    unsubscribeMessages = onSnapshot(q, snapshot => {
+      messagesDiv.innerHTML = '';
+      snapshot.forEach(docSnap => {
+        const msg = docSnap.data();
+        const isSent = msg.uid === currentUser?.uid;
+
+        const div = document.createElement('div');
+        div.className = `message ${isSent ? 'sent' : 'received'}`;
+        div.innerHTML = `
+          <div class="msg-sender">${msg.senderName || 'Anonymous'} 😊</div>
+          ${msg.text}
+          <div class="msg-time">${formatDate(msg.createdAt)}</div>
+        `;
+
+        if (isAdmin) {
+          const delBtn = document.createElement('button');
+          delBtn.textContent = '×';
+          delBtn.style = 'position:absolute;top:6px;right:8px;background:none;border:none;color:var(--danger);font-weight:bold;font-size:1.1rem;cursor:pointer;opacity:0.7';
+          delBtn.onclick = () => deleteDoc(docSnap.ref).catch(console.error);
+          div.appendChild(delBtn);
+          div.style.position = 'relative';
+        }
+
+        messagesDiv.appendChild(div);
+      });
+
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }, console.error);
+  }
+
+  async function sendMessage() {
+    const text = msgInput.value.trim();
+    if (!text || !currentUser) return;
+
+    try {
+      await addDoc(collection(db, "messages"), {
+        text,
+        uid: currentUser.uid,
+        senderName: currentUser.displayName || currentUser.email.split('@')[0],
+        createdAt: serverTimestamp()
+      });
+      msgInput.value = '';
+      msgInput.focus();
+    } catch (e) {
+      console.error("Send failed:", e);
+    }
+  }
+
+  sendBtn.onclick = sendMessage;
+
+  msgInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  msgInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+  });
+
+  // ── PUSH NOTIFICATIONS ────────────────────────────────────────
+  async function setupPushNotifications() {
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+
+      const token = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY_HERE' }); // ← GENERATE VAPID KEY IN FIREBASE CONSOLE!
+
+      // Save token to user doc
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        tokens: arrayUnion(token)
+      });
+
+      // Handle foreground messages
+      onMessage(messaging, (payload) => {
+        console.log('Message received. ', payload);
+        // Show notification or update UI
+        new Notification(payload.notification.title, { body: payload.notification.body });
+      });
+    } catch (err) {
+      console.error('Push setup failed:', err);
+    }
+  }
+
+  // ── ADMIN PANEL ───────────────────────────────────────────────
+  adminBtn.onclick = async () => {
+    const pass = prompt("Enter admin password: 🔑");
+    if (pass !== "#TechBrian@01") {
+      alert("Wrong password! ❌");
+      return;
+    }
+
+    adminModal.style.display = 'flex';
+    loadAdminData();
+  };
+
+  closeAdmin.onclick = () => {
+    adminModal.style.display = 'none';
+    userList.innerHTML = '';
+    msgList.innerHTML = '';
+  };
+
+  async function loadAdminData() {
+    // Load users
+    userList.innerHTML = '';
+    const usersQuery = query(collection(db, 'users'));
+    const usersSnap = await getDocs(usersQuery);
+    usersSnap.forEach(userDoc => {
+      const user = userDoc.data();
+      const item = document.createElement('div');
+      item.className = 'user-item';
+      item.innerHTML = `
+        ${user.name} (${user.email}) ${user.banned ? '🚫' : ''}
+      `;
+      const banBtn = document.createElement('button');
+      banBtn.textContent = user.banned ? 'Unban ✅' : 'Ban 🚫';
+      banBtn.className = user.banned ? '' : 'danger';
+      banBtn.onclick = async () => {
+        await updateDoc(userDoc.ref, { banned: !user.banned });
+        loadAdminData();
+      };
+      item.appendChild(banBtn);
+
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete ❌';
+      delBtn.className = 'danger';
+      delBtn.onclick = async () => {
+        if (confirm('Delete user? This only deletes profile, not Auth.')) {
+          await deleteDoc(userDoc.ref);
+          loadAdminData();
+        }
+      };
+      item.appendChild(delBtn);
+
+      userList.appendChild(item);
+    });
+
+    // Load messages
+    msgList.innerHTML = '';
+    const msgsQuery = query(collection(db, 'messages'), orderBy('createdAt', 'desc'));
+    const msgsSnap = await getDocs(msgsQuery);
+    msgsSnap.forEach(msgDoc => {
+      const msg = msgDoc.data();
+      const item = document.createElement('div');
+      item.className = 'msg-item';
+      item.innerHTML = `
+        ${msg.senderName}: ${msg.text} (${formatDate(msg.createdAt)})
+      `;
+      const delBtn = document.createElement('button');
+      delBtn.textContent = 'Delete ❌';
+      delBtn.className = 'danger';
+      delBtn.onclick = () => deleteDoc(msgDoc.ref).then(loadAdminData);
+      item.appendChild(delBtn);
+      msgList.appendChild(item);
+    });
+  }
+
+  // Init
+  initTheme();
+  showLogin.click();
+
+  // PWA install prompt
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+  });
+</script>
+</body>
+</html>
